@@ -93,10 +93,28 @@ The system employs an event-driven, asynchronous microservices architecture to h
 
 ## 2. Prerequisites
 
-*   **Google Cloud SDK:** [Install gcloud CLI](https://cloud.google.com/sdk/docs/install)
-*   **Python 3.9+**
-*   **Docker:** [Install Docker](https://docs.docker.com/get-docker/)
-*   A GCP Project with billing enabled.
+To set up and run the Figgy Food Delivery application, you will need the following installed and configured on your local machine:
+
+*   **Google Cloud SDK (`gcloud` CLI):**
+    This is the command-line interface for Google Cloud, essential for interacting with your GCP resources.
+    *   **Installation:** Follow the official Google Cloud SDK installation guide for your operating system: [Install gcloud CLI](https://cloud.google.com/sdk/docs/install)
+    *   **Initialization:** After installation, initialize the SDK: `gcloud init`
+
+*   **Python 3.9+:**
+    Python is required for running the backend microservices (Flask applications) and Cloud Functions.
+    *   **Installation:**
+        *   **Linux (Debian/Ubuntu):** `sudo apt update && sudo apt install python3.9 python3.9-venv python3-pip`
+        *   **macOS (with Homebrew):** `brew install python@3.9`
+        *   **Windows:** Download the installer from the [official Python website](https://www.python.org/downloads/). Ensure you add Python to your system PATH during installation.
+
+*   **Docker:**
+    Docker is essential for building and running the containerized Cloud Run services (both locally and for Cloud Build).
+    *   **Installation:** Follow the official Docker installation guides for your operating system: [Get Docker](https://docs.docker.com/get-docker/)
+
+*   **A Google Cloud Project with billing enabled:**
+    This is a fundamental requirement for deploying and using any Google Cloud services.
+    *   **Creation:** Create a new project via the [Google Cloud Console](https://console.cloud.google.com/).
+    *   **Billing:** Ensure billing is enabled and linked to your project in the Cloud Console's "Billing" section.
 
 ---
 
@@ -237,11 +255,64 @@ Figgy/
 ├── delivery_completion_service/
 │   ├── main.py
 │   └── requirements.txt
+├── frontend/             # NEW: React UI application
+│   ├── public/
+│   ├── src/
+│   ├── .env              # Environment variables for local dev
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── cloudbuild.yaml   # Cloud Build config for frontend deployment
 ├── openapi.yaml
 ├── cloudbuild.yaml
 ├── skaffold.yaml
 └── setup_gcp.sh
 ```
+
+### Frontend Application (React)
+
+The frontend is a React application built with TypeScript, providing a rich user interface for interacting with the Figgy Food Delivery backend. It's designed to mimic food ordering platforms like Zomato or Swiggy.
+
+**`Figgy/frontend/`**
+
+This directory contains the React application.
+
+#### Local Development
+
+To run the frontend application locally:
+
+1.  **Navigate to the frontend directory:**
+    ```bash
+    cd frontend
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+3.  **Start the development server:**
+    The application will typically run on `http://localhost:3000`. It will attempt to connect to the backend services via the API Gateway URL configured in `.env`.
+
+    ```bash
+    npm start
+    ```
+    **Important:** Ensure the `REACT_APP_API_GATEWAY_URL` in `frontend/.env` points to your *deployed* API Gateway (or a proxy to it) if you want to interact with the deployed backend. For initial local testing with the backend also running locally, you might point it to `http://localhost:8080` (or wherever your backend serves).
+
+#### Deployment to Google Cloud Storage
+
+The frontend can be deployed as a static website to Google Cloud Storage and optionally served via Google Cloud CDN for optimal performance. A dedicated `cloudbuild.yaml` is provided within the `frontend/` directory for this purpose.
+
+1.  **Ensure Cloud Storage API is enabled:** This is handled by the `setup_gcp.sh` script.
+2.  **Ensure necessary IAM roles are granted:** The Cloud Build service account needs write permissions to the GCS bucket (`roles/storage.admin` or `roles/storage.objectAdmin`).
+3.  **Deploy using Cloud Build:**
+    Navigate to the root of the `Figgy_App` directory and submit the `frontend/cloudbuild.yaml`. You *must* provide the `_API_GATEWAY_URL` substitution with the URL of your deployed API Gateway.
+
+    ```bash
+    gcloud builds submit . --config frontend/cloudbuild.yaml \
+      --substitutions=_API_GATEWAY_URL="https://[YOUR_API_GATEWAY_DOMAIN]"
+    ```
+    Replace `[YOUR_API_GATEWAY_DOMAIN]` with the `defaultHostname` obtained after setting up your API Gateway.
+
+    After successful deployment, your frontend application will be available at `https://storage.googleapis.com/[YOUR_FRONTEND_BUCKET_NAME]/index.html` (where `[YOUR_FRONTEND_BUCKET_NAME]` defaults to `figgy-frontend-[YOUR_PROJECT_ID]`). For a custom domain or CDN setup, further GCP configuration is required.
+
 
 ### Common Utilities (`Figgy/common/`)
 
@@ -720,291 +791,219 @@ def complete_delivery(request):
         return "Internal Server Error", 500
 ```
 
+### Note on Running Services and Common Utilities
+
+It's important to understand how different parts of this application are "run":
+*   **Common Utilities (`Figgy/common/`):** These files contain reusable code (like Firestore or Pub/Sub client helpers). They are **not** standalone applications that you run directly. Instead, they are imported and used by the backend microservices and Cloud Functions.
+*   **Backend Microservices (User Service, Order Processor, Restaurant Service, Delivery Orchestrator, Delivery Completion Service):** These are the core logic components of your application.
+    *   **In Production:** These services are designed to be deployed to and managed by Google Cloud (Cloud Run for containerized services, Cloud Functions for serverless functions). Once deployed, Google Cloud automatically handles their execution, scaling, and lifecycle in response to HTTP requests, Pub/Sub messages, or Cloud Task triggers. You do **not** manually execute individual service files for the running application in the cloud.
+    *   **For Local Development:** You can run these services on your local machine for testing and development purposes. For example, Flask applications can be run using `python main.py` (or `gunicorn`), and Cloud Functions can be emulated with the Functions Framework. Refer to each service's specific development setup if needed, though local deployment via Skaffold is generally preferred for Cloud Run services.
+
 ---
 
-## 5. Continuous Integration/Continuous Deployment (CI/CD)
+## 5. Automated Deployment (CI/CD)
 
-This section provides the `cloudbuild.yaml` and `skaffold.yaml` files for automating build, test, and deployment.
+This section details how to automate the build and deployment process using Google Cloud Build for continuous integration and continuous deployment, and how Skaffold can be used for local development.
 
-### Cloud Build Configuration (`Figgy/cloudbuild.yaml`)
+### 5.1 Cloud Build for CI/CD
 
-This `cloudbuild.yaml` defines a CI/CD pipeline to build Docker images for Cloud Run services, deploy Cloud Run services, and deploy Cloud Functions.
+The `cloudbuild.yaml` file defines a comprehensive CI/CD pipeline. It automates the following for your microservices:
+*   Building Docker images for Cloud Run services.
+*   Pushing Docker images to Google Container Registry (GCR) or Artifact Registry.
+*   Deploying Cloud Run services to the specified region.
+*   Creating Pub/Sub push subscriptions for Cloud Run services.
+*   Deploying Cloud Functions (Delivery Orchestrator and Delivery Completion Service).
+*   Setting up environment variables for Cloud Functions, including the URL of the Delivery Completion Service.
 
-```yaml
-# cloudbuild.yaml
-steps:
-  # Build and Deploy User Service (Cloud Run)
-  - id: 'Build User Service'
-    name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA', './user_service']
-  - id: 'Push User Service Image'
-    name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA']
-  - id: 'Deploy User Service'
-    name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - 'run'
-      - 'deploy'
-      - 'user-service'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA'
-      - '--platform'
-      - 'managed'
-      - '--region'
-      - '${_REGION}'
-      - '--service-account'
-      - 'figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com'
-      - '--allow-unauthenticated'
-      - '--set-env-vars'
-      - 'GCP_PROJECT=$PROJECT_ID'
+To trigger an automated deployment using Cloud Build:
 
-  # Build and Deploy Order Processor (Cloud Run)
-  - id: 'Build Order Processor'
-    name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA', './order_processor']
-  - id: 'Push Order Processor Image'
-    name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA']
-  - id: 'Deploy Order Processor'
-    name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - 'run'
-      - 'deploy'
-      - 'order-processor'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA'
-      - '--platform'
-      - 'managed'
-      - '--region'
-      - '${_REGION}'
-      - '--service-account'
-      - 'figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com'
-      - '--no-allow-unauthenticated' # Internal service, no direct unauthenticated access
-      - '--set-env-vars'
-      - 'GCP_PROJECT=$PROJECT_ID'
-      - '--update-secrets'
-      - 'PUB_SUB_PUSH_TOKEN=projects/$PROJECT_ID/secrets/pubsub-push-token:latest' # Example: Securely access a token if needed
-    # Ensure Pub/Sub push subscription is created AFTER the service is deployed and has a URL
-    waitFor: ['Deploy User Service', 'Push Order Processor Image']
-  - id: 'Create Order Processor Pub/Sub Subscription'
-    name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        SERVICE_URL=$(gcloud run services describe order-processor --platform managed --region ${_REGION} --format 'value(status.url)')
-        gcloud pubsub subscriptions create order-processor-sub 
-          --topic orders.place 
-          --push-endpoint "$SERVICE_URL" 
-          --enable-wrapper-headers 
-          --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
-          --ack-deadline=300 
-          --message-retention-duration=7d || true # Create or update
+1.  **Ensure Cloud Build API is enabled:** This is handled by the `setup_gcp.sh` script.
+2.  **Ensure necessary IAM roles are granted:** The Cloud Build service account (`service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`) needs appropriate permissions, including `Cloud Functions Developer` and `Service Account User` roles for deploying Cloud Functions. This is handled by the updated `setup_gcp.sh` script.
+3.  **Submit the `cloudbuild.yaml`:**
+    Navigate to the root of the `Figgy_App` directory and run the following command. Replace `[YOUR_REGION]` with your desired GCP region.
 
-  # Build and Deploy Restaurant Service (Cloud Run)
-  - id: 'Build Restaurant Service'
-    name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA', './restaurant_service']
-  - id: 'Push Restaurant Service Image'
-    name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA']
-  - id: 'Deploy Restaurant Service'
-    name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - 'run'
-      - 'deploy'
-      - 'restaurant-service'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA'
-      - '--platform'
-      - 'managed'
-      - '--region'
-      - '${_REGION}'
-      - '--service-account'
-      - 'figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com'
-      - '--no-allow-unauthenticated'
-      - '--set-env-vars'
-      - 'GCP_PROJECT=$PROJECT_ID'
-    waitFor: ['Deploy Order Processor', 'Push Restaurant Service Image']
-  - id: 'Create Restaurant Service Pub/Sub Subscription'
-    name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        SERVICE_URL=$(gcloud run services describe restaurant-service --platform managed --region ${_REGION} --format 'value(status.url)')
-        gcloud pubsub subscriptions create restaurant-service-sub 
-          --topic orders.created 
-          --push-endpoint "$SERVICE_URL" 
-          --enable-wrapper-headers 
-          --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
-          --ack-deadline=300 
-          --message-retention-duration=7d || true
+    ```bash
+    gcloud builds submit --config cloudbuild.yaml . --substitutions=_REGION=[YOUR_REGION]
+    ```
+    This command will execute the entire pipeline defined in `cloudbuild.yaml`, building and deploying all Cloud Run services and Cloud Functions. You can monitor the build progress in the Cloud Build section of the GCP Console.
 
-  # Deploy Delivery Completion Service (Cloud Function) - needs to be deployed first to get URL
-  - id: 'Deploy Delivery Completion CF'
-    name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - 'functions'
-      - 'deploy'
-      - 'delivery-completion-service'
-      - '--runtime'
-      - 'python39'
-      - '--trigger-http'
-      - '--source'
-      - './delivery_completion_service'
-      - '--entry-point'
-      - 'complete_delivery'
-      - '--region'
-      - '${_REGION}'
-      - '--service-account'
-      - 'figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com'
-      - '--allow-unauthenticated' # Cloud Tasks will handle auth via OIDC token
-    waitFor: ['Deploy Restaurant Service'] # Ensure other services are up
+### 5.2 Skaffold for Local Development
 
-  # Deploy Delivery Orchestrator (Cloud Function)
-  - id: 'Deploy Delivery Orchestrator CF'
-    name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        DELIVERY_COMPLETION_URL=$(gcloud functions describe delivery-completion-service --region ${_REGION} --format 'value(httpsTrigger.url)')
-        gcloud functions deploy delivery-orchestrator 
-          --runtime python39 
-          --trigger-http 
-          --source ./delivery_orchestrator 
-          --entry-point orchestrate_delivery 
-          --region "${_REGION}" 
-          --service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
-          --no-allow-unauthenticated 
-          --set-env-vars="DELIVERY_COMPLETION_URL=$DELIVERY_COMPLETION_URL,GCP_PROJECT=$PROJECT_ID,FUNCTION_REGION=${_REGION},SERVICE_ACCOUNT_EMAIL=figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com"
-    waitFor: ['Deploy Delivery Completion CF']
+`skaffold.yaml` is configured to facilitate local development workflows. Skaffold can watch for changes in your local code, automatically rebuild Docker images, and redeploy your Cloud Run services to a local or remote Kubernetes/Cloud Run environment. This provides a rapid feedback loop during development.
 
-# Set global environment variables
-options:
-  logging: CLOUD_LOGGING_ONLY
-substitutions:
-  _REGION: us-central1 # Default region, override with --substitutions=_REGION=your-region
-```
+To use Skaffold:
 
-### Skaffold Configuration (`Figgy/skaffold.yaml`)
+1.  **Install Skaffold:** If you haven't already, install Skaffold by following the official documentation: [Skaffold Installation Guide](https://skaffold.dev/docs/install/)
+2.  **Configure Skaffold:**
+    Before running Skaffold, ensure `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` are updated within the `skaffold.yaml` file.
+3.  **Run Skaffold in development mode:**
+    Navigate to the root of the `Figgy_App` directory and run:
 
-Skaffold helps with local development by watching for code changes, rebuilding images, and redeploying. It can also manage deployments to various environments.
+    ```bash
+    skaffold dev --port-forward
+    ```
+    This command will:
+    *   Build Docker images for your Cloud Run services (`user-service`, `order-processor`, `restaurant-service`).
+    *   Deploy them to Cloud Run (or a local Kubernetes cluster if configured).
+    *   Forward ports, allowing you to access `user-service` locally on `localhost:8080`.
+    *   Continuously watch your code for changes and redeploy automatically.
 
-```yaml
-# skaffold.yaml
-apiVersion: skaffold/v2beta28
-kind: Config
-metadata:
-  name: figgy-food-delivery
-build:
-  artifacts:
-  - image: user-service
-    context: user_service
-    docker:
-      dockerfile: Dockerfile
-  - image: order-processor
-    context: order_processor
-    docker:
-      dockerfile: Dockerfile
-  - image: restaurant-service
-    context: restaurant_service
-    docker:
-      dockerfile: Dockerfile
-  tagPolicy:
-    gitCommit: {} # Tags images with git commit SHA
-deploy:
-  cloudrun:
-    # Skaffold does not support deploying Cloud Functions directly.
-    # Cloud Functions need to be deployed separately or via Cloud Build.
-    # This section focuses on Cloud Run services.
-    defaultProjectID: "[YOUR_PROJECT_ID]"
-    region: "[YOUR_REGION]"
-    projects:
-      - "[YOUR_PROJECT_ID]"
-    configs:
-      - service: user-service
-        image: user-service
-        # For local development, allow unauthenticated access
-        flags:
-          - "--allow-unauthenticated"
-        env:
-          - name: GCP_PROJECT
-            value: "[YOUR_PROJECT_ID]"
-      - service: order-processor
-        image: order-processor
-        # Internal service, no direct unauthenticated access
-        flags:
-          - "--no-allow-unauthenticated"
-        env:
-          - name: GCP_PROJECT
-            value: "[YOUR_PROJECT_ID]"
-      - service: restaurant-service
-        image: restaurant-service
-        # Internal service, no direct unauthenticated access
-        flags:
-          - "--no-allow-unauthenticated"
-        env:
-          - name: GCP_PROJECT
-            value: "[YOUR_PROJECT_ID]"
-portForward:
-  - resourceType: Service
-    resourceName: user-service
-    port: 8080 # Expose User Service on localhost:8080
-```
-**Replace `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` in `skaffold.yaml`**
+    *(Note: Skaffold does not directly support deploying Cloud Functions; these would still need to be deployed manually or via Cloud Build as described above.)*
 
 ---
 
 ## 6. Deployment Steps
 
-Ensure you are in the `Figgy/` directory.
+This section outlines how to manually set up your GCP project and deploy the Figgy Food Delivery microservices.
 
-### Initial GCP Setup
-Run the `setup_gcp.sh` script to configure your GCP project:
-```bash
-chmod +x setup_gcp.sh
-./setup_gcp.sh
-```
-**Important:** Update `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` within `setup_gcp.sh` before running it. Also ensure the Cloud Build Service Account (`service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`) has the `Cloud Functions Developer` role for Cloud Build to deploy Cloud Functions.
+### 6.1 Initial GCP Project Setup
 
-### Deploy Services
+Before deploying the application, you need to set up your Google Cloud Project.
 
-**1. Get Cloud Function URLs:**
-You need the URL of `delivery-completion-service` to deploy `delivery-orchestrator`.
-```bash
-# Deploy delivery-completion-service first manually to get its URL, or get it from Cloud Build output
-gcloud functions deploy delivery-completion-service 
-  --runtime python39 
-  --trigger-http 
-  --source ./delivery_completion_service 
-  --entry-point complete_delivery 
-  --region [YOUR_REGION] 
-  --service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" 
-  --allow-unauthenticated # Cloud Tasks will handle auth via OIDC token
-```
-Take note of the `https Trigger URL` from the output. We'll call it `DELIVERY_COMPLETION_URL`.
+1.  **Configure gcloud CLI:**
+    Ensure your `gcloud` CLI is configured to the correct project and region. Replace `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` with your actual project ID and desired GCP region (e.g., `us-central1`).
 
-Now, manually deploy the `delivery-orchestrator` with the URL:
-```bash
-gcloud functions deploy delivery-orchestrator 
-  --runtime python39 
-  --trigger-http 
-  --source ./delivery_orchestrator 
-  --entry-point orchestrate_delivery 
-  --region [YOUR_REGION] 
-  --service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" 
-  --no-allow-unauthenticated 
-  --set-env-vars="DELIVERY_COMPLETION_URL=[PASTE_YOUR_DELIVERY_COMPLETION_URL_HERE],GCP_PROJECT=[YOUR_PROJECT_ID],FUNCTION_REGION=[YOUR_REGION],SERVICE_ACCOUNT_EMAIL=figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com"
-```
+    ```bash
+    gcloud config set project [YOUR_PROJECT_ID]
+    gcloud config set run/region [YOUR_REGION]
+    gcloud config set functions/region [YOUR_REGION]
+    ```
 
-**2. Deploy Cloud Run Services via Cloud Build:**
-For Cloud Run services, use the `cloudbuild.yaml`.
-```bash
-gcloud builds submit --config cloudbuild.yaml . --substitutions=_REGION=[YOUR_REGION]
-```
-This will build and deploy `user-service`, `order-processor`, and `restaurant-service` and set up their Pub/Sub push subscriptions.
+2.  **Run the GCP Setup Script:**
+    Navigate to the root of the `Figgy_App` directory and execute the `setup_gcp.sh` script. This script automates API enablement, service account creation, IAM role assignments, Firestore database creation, Pub/Sub topic setup, and Cloud Tasks queue creation.
+
+    ```bash
+    chmod +x setup_gcp.sh
+    ./setup_gcp.sh
+    ```
+    **Important:** Before running, ensure you have reviewed and replaced `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` within the `setup_gcp.sh` script itself, if you prefer to hardcode them. The script relies on these variables. Also, ensure the Cloud Build Service Account (`service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`) has the `Cloud Functions Developer` role for Cloud Build to deploy Cloud Functions (this is handled by the updated `setup_gcp.sh`).
+
+### 6.2 Manual Service Deployment
+
+Follow these steps to manually deploy each service. Ensure you have activated your `gcloud` account and set the correct project and region as described in the "Initial GCP Project Setup" section.
+
+#### 6.2.1 Deploy Cloud Run Services
+
+Cloud Run services (User Service, Order Processor, Restaurant Service) are deployed as Docker containers.
+
+1.  **Build and Push Docker Images (for each Cloud Run service):**
+    For each of `user_service`, `order_processor`, and `restaurant_service`, navigate to its respective directory and build the Docker image. Then, push the image to Google Container Registry (GCR) or Artifact Registry. Replace `[YOUR_PROJECT_ID]` with your project ID and `[SERVICE_NAME]` (e.g., `user-service`, `order-processor`, `restaurant-service`).
+
+    ```bash
+    # Example for User Service
+    cd user_service
+    docker build -t gcr.io/[YOUR_PROJECT_ID]/user-service:latest .
+    docker push gcr.io/[YOUR_PROJECT_ID]/user-service:latest
+    cd .. # Go back to Figgy_App root
+
+    # Repeat for order_processor and restaurant_service
+    cd order_processor
+    docker build -t gcr.io/[YOUR_PROJECT_ID]/order-processor:latest .
+    docker push gcr.io/[YOUR_PROJECT_ID]/order-processor:latest
+    cd ..
+
+    cd restaurant_service
+    docker build -t gcr.io/[YOUR_PROJECT_ID]/restaurant-service:latest .
+    docker push gcr.io/[YOUR_PROJECT_ID]/restaurant-service:latest
+    cd ..
+    ```
+    *(Note: For production, using Cloud Build to automate this process is recommended, as shown in Section 6.3 Automated Deployment.)*
+
+2.  **Deploy Cloud Run Services:**
+    Deploy each service to Cloud Run. Replace `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` accordingly. The `--set-env-vars` option sets environment variables required by the services.
+
+    *   **User Service:**
+        ```bash
+        gcloud run deploy user-service \
+          --image gcr.io/[YOUR_PROJECT_ID]/user-service:latest \
+          --platform managed \
+          --region [YOUR_REGION] \
+          --service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+          --allow-unauthenticated \
+          --set-env-vars="GCP_PROJECT=[YOUR_PROJECT_ID]"
+        ```
+        Take note of the `Service URL` output for the User Service; you will need it for the API Gateway setup.
+
+    *   **Order Processor:**
+        ```bash
+        gcloud run deploy order-processor \
+          --image gcr.io/[YOUR_PROJECT_ID]/order-processor:latest \
+          --platform managed \
+          --region [YOUR_REGION] \
+          --service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+          --no-allow-unauthenticated \
+          --set-env-vars="GCP_PROJECT=[YOUR_PROJECT_ID]"
+        ```
+        After deploying the Order Processor, you need to create its Pub/Sub push subscription. Get the `Service URL` for the `order-processor` and use it below:
+
+        ```bash
+        SERVICE_URL=$(gcloud run services describe order-processor --platform managed --region [YOUR_REGION] --format 'value(status.url)')
+        gcloud pubsub subscriptions create order-processor-sub \
+          --topic orders.place \
+          --push-endpoint "$SERVICE_URL" \
+          --enable-wrapper-headers \
+          --push-auth-service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+          --ack-deadline=300 \
+          --message-retention-duration=7d # Create or update
+        ```
+
+    *   **Restaurant Service:**
+        ```bash
+        gcloud run deploy restaurant-service \
+          --image gcr.io/[YOUR_PROJECT_ID]/restaurant-service:latest \
+          --platform managed \
+          --region [YOUR_REGION] \
+          --service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+          --no-allow-unauthenticated \
+          --set-env-vars="GCP_PROJECT=[YOUR_PROJECT_ID]"
+        ```
+        After deploying the Restaurant Service, create its Pub/Sub push subscription. Get the `Service URL` for the `restaurant-service` and use it below:
+
+        ```bash
+        SERVICE_URL=$(gcloud run services describe restaurant-service --platform managed --region [YOUR_REGION] --format 'value(status.url)')
+        gcloud pubsub subscriptions create restaurant-service-sub \
+          --topic orders.created \
+          --push-endpoint "$SERVICE_URL" \
+          --enable-wrapper-headers \
+          --push-auth-service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+          --ack-deadline=300 \
+          --message-retention-duration=7d # Create or update
+        ```
+
+#### 6.2.2 Deploy Cloud Functions
+
+Deploy the two Cloud Functions: `delivery-completion-service` and `delivery-orchestrator`.
+
+1.  **Deploy Delivery Completion Service:**
+    This function needs to be deployed first to obtain its URL, which is then used by the `delivery-orchestrator`.
+
+    ```bash
+    gcloud functions deploy delivery-completion-service \
+      --runtime python39 \
+      --trigger-http \
+      --source ./delivery_completion_service \
+      --entry-point complete_delivery \
+      --region [YOUR_REGION] \
+      --service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+      --allow-unauthenticated # Cloud Tasks will handle auth via OIDC token
+    ```
+    Take note of the `https Trigger URL` from the output. We'll refer to this as `DELIVERY_COMPLETION_URL` for the next step.
+
+2.  **Deploy Delivery Orchestrator:**
+    Deploy the orchestrator, passing the `DELIVERY_COMPLETION_URL` as an environment variable.
+
+    ```bash
+    gcloud functions deploy delivery-orchestrator \
+      --runtime python39 \
+      --trigger-http \
+      --source ./delivery_orchestrator \
+      --entry-point orchestrate_delivery \
+      --region "[YOUR_REGION]" \
+      --service-account="figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+      --no-allow-unauthenticated \
+      --set-env-vars="DELIVERY_COMPLETION_URL=[PASTE_YOUR_DELIVERY_COMPLETION_URL_HERE],GCP_PROJECT=[YOUR_PROJECT_ID],FUNCTION_REGION=[YOUR_REGION],SERVICE_ACCOUNT_EMAIL=figgy-service-account@[YOUR_PROJECT_ID].iam.gserviceaccount.com"
+    ```
+
 
 ### API Gateway Setup
 

@@ -3,6 +3,7 @@ import uuid
 import json
 from flask import Flask, request, jsonify
 from common.pubsub_client import get_pubsub_publisher_client, get_topic_path
+from google.cloud import firestore
 
 PROJECT_ID = os.environ.get("GCP_PROJECT")
 ORDERS_PLACE_TOPIC_ID = "orders.place"
@@ -11,6 +12,51 @@ publisher = get_pubsub_publisher_client()
 orders_place_topic_path = get_topic_path(PROJECT_ID, ORDERS_PLACE_TOPIC_ID)
 
 app = Flask(__name__)
+
+# Mock restaurant data for demonstration
+RESTAURANT_DATA = {
+    "rest789": {
+        "name": "Burger Joint",
+        "description": "Best burgers in town!",
+        "menu": [
+            {"id": "item1", "name": "Classic Burger", "price": 10.99},
+            {"id": "item2", "name": "Cheese Burger", "price": 12.99},
+            {"id": "item3", "name": "Fries", "price": 3.49},
+            {"id": "item4", "name": "Coke", "price": 2.50},
+        ],
+        "address": "123 Burger St",
+        "cuisine": "American"
+    },
+    "rest101": {
+        "name": "Pizza Palace",
+        "description": "Authentic Italian pizzas.",
+        "menu": [
+            {"id": "item5", "name": "Margherita Pizza", "price": 15.00},
+            {"id": "item6", "name": "Pepperoni Pizza", "price": 16.50},
+            {"id": "item7", "name": "Garlic Bread", "price": 4.00},
+        ],
+        "address": "456 Pizza Ave",
+        "cuisine": "Italian"
+    }
+}
+
+@app.route("/restaurants", methods=["GET"])
+def list_restaurants():
+    """Returns a list of all available restaurants."""
+    restaurants_list = [
+        {"id": r_id, "name": data["name"], "description": data["description"], "cuisine": data["cuisine"]}
+        for r_id, data in RESTAURANT_DATA.items()
+    ]
+    return jsonify(restaurants_list), 200
+
+@app.route("/restaurants/<string:restaurant_id>", methods=["GET"])
+def get_restaurant_details(restaurant_id):
+    """Returns details and menu for a specific restaurant."""
+    restaurant = RESTAURANT_DATA.get(restaurant_id)
+    if not restaurant:
+        return jsonify({"error": "Restaurant not found"}), 404
+    return jsonify(restaurant), 200
+
 
 @app.route("/orders", methods=["POST"])
 def place_order():

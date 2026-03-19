@@ -1,0 +1,71 @@
+# Figgy_App/frontend/cloudbuild.yaml
+steps:
+  - id: 'Install Dependencies'
+    name: 'gcr.io/cloud-builders/npm'
+    args: ['install']
+    dir: 'frontend' # Execute in the frontend directory
+
+  - id: 'Build React App'
+    name: 'gcr.io/cloud-builders/npm'
+    args: ['run', 'build']
+    dir: 'frontend' # Execute in the frontend directory
+    env:
+      # Pass the API Gateway URL for the frontend build
+      # This needs to be the deployed API Gateway URL, not localhost
+      - 'REACT_APP_API_GATEWAY_URL=${_API_GATEWAY_URL}'
+
+  - id: 'Upload to GCS'
+    name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - '-m'
+      - 'rsync'
+      - '-r'
+      - '-c' # Copy if checksums differ
+      - '-d' # Delete extra files in bucket
+      - 'frontend/build' # Source directory
+      - 'gs://${_FRONTEND_BUCKET_NAME}' # Destination bucket
+    waitFor: ['Build React App'] # Wait for the build step to complete
+
+  - id: 'Set Public-Read Permissions'
+    name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - 'iam'
+      - 'ch'
+      - 'allUsers:objectViewer'
+      - 'gs://${_FRONTEND_BUCKET_NAME}'
+    waitFor: ['Upload to GCS'] # After uploading, set permissions
+
+  - id: 'Set Main Page Suffix'
+    name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - 'web'
+      - 'set'
+      - '-m'
+      - 'index.html'
+      - '-e'
+      - 'index.html' # For single-page applications, usually both are index.html
+      - 'gs://${_FRONTEND_BUCKET_NAME}'
+    waitFor: ['Set Public-Read Permissions'] # After setting public read, configure web server
+
+  - id: 'Configure CORS'
+    name: 'gcr.io/cloud-builders/gsutil'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cat > cors-config.json <<EOF
+        [
+          {
+            "origin": ["*"],
+            "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
+            "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
+            "maxAgeSeconds": 3600
+          }
+        ]
+        EOF
+        gsutil cors set cors-config.json gs://${_FRONTEND_BUCKET_NAME}
+    waitFor: ['Set Main Page Suffix'] # After setting web server, configure CORS
+
+substitutions:
+  _FRONTEND_BUCKET_NAME: 'figgy-frontend-${PROJECT_ID}' # Default bucket name
+  _API_GATEWAY_URL: 'https://[YOUR_API_GATEWAY_DOMAIN]' # Placeholder for API Gateway URL

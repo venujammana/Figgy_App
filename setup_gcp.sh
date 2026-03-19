@@ -14,18 +14,22 @@ gcloud config set functions/region "$REGION"
 
 # --- Enable necessary APIs ---
 echo "Enabling required GCP APIs..."
-gcloud services enable 
-  run.googleapis.com 
-  cloudfunctions.googleapis.com 
-  cloudbuild.googleapis.com 
-  pubsub.googleapis.com 
-  firestore.googleapis.com 
-  cloudtasks.googleapis.com 
-  apigateway.googleapis.com 
-  iam.googleapis.com 
-  servicecontrol.googleapis.com 
-  servicemanagement.googleapis.com 
-  cloudresourcemanager.googleapis.com # Needed for policy bindings
+gcloud services enable \
+  run.googleapis.com \
+  cloudfunctions.googleapis.com \
+  cloudbuild.googleapis.com \
+  pubsub.googleapis.com \
+  firestore.googleapis.com \
+  cloudtasks.googleapis.com \
+  apigateway.googleapis.com \
+  iam.googleapis.com \
+  servicecontrol.googleapis.com \
+  servicemanagement.googleapis.com \
+  cloudresourcemanager.googleapis.com \
+  eventarc.googleapis.com \
+  compute.googleapis.com \
+  artifactregistry.googleapis.com \
+  secretmanager.googleapis.com # Needed for policy bindings
 
 # --- Service Account Setup ---
 echo "Creating service account: ${SERVICE_ACCOUNT_NAME}..."
@@ -58,12 +62,56 @@ gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL"
     --role="roles/iam.serviceAccountUser" --quiet
 
 # Role for Cloud Run services to invoke other services (e.g. Delivery Orchestrator) if using authenticated calls
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
   --role="roles/run.invoker" --quiet
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="roles/cloudtasks.admin" --quiet
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+
+  --member="serviceAccount:$SA_EMAIL" \
+
+  --role="roles/serviceusage.serviceUsageAdmin" --quiet
+
+
+
+
+
+# --- Cloud Build Service Account Setup for Cloud Functions Deployment ---
+
+echo "Retrieving project number for Cloud Build service account..."
+
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+
+CLOUD_BUILD_SA_EMAIL="service-${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
+
+
+
+echo "Assigning Cloud Functions Developer and Service Account User roles to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+
+  --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
+
+  --role="roles/cloudfunctions.developer" --quiet
+
+
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+
+  --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
+
+  --role="roles/iam.serviceAccountUser" --quiet
+
+
+
 
 
 # --- GCP Resource Creation ---
+
 echo "Creating Firestore database..."
 gcloud firestore databases create --location="$REGION" || true # '|| true' to ignore if already exists
 
