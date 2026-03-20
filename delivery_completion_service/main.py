@@ -1,10 +1,13 @@
 import os
-from common.firestore_client import get_firestore_client # Using common client
+from flask import Flask, request
+from common.firestore_client import get_firestore_client
 from google.cloud import firestore
 
+app = Flask(__name__)
 db = get_firestore_client()
 
-def complete_delivery(request):
+@app.route("/", methods=["POST"])
+def complete_delivery_endpoint():
     """
     HTTP-triggered function invoked by a Cloud Task.
     Updates the order status to 'delivered'.
@@ -36,3 +39,6 @@ def complete_delivery(request):
     except Exception as e:
         print(f"Error updating order {order_id}: {e}")
         return "Internal Server Error", 500
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
