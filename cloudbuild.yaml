@@ -58,7 +58,7 @@ steps:
       - |
         SERVICE_URL=$$(gcloud run services describe order-processor --platform managed --region ${_REGION} --format 'value(status.url)')
         gcloud pubsub subscriptions create order-processor-sub 
-          --topic orders.place 
+          --topic projects/$PROJECT_ID/topics/orders.place 
           --push-endpoint "$$SERVICE_URL" 
           --enable-wrapper-headers 
           --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
@@ -71,7 +71,7 @@ steps:
     args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/restaurant-service:$COMMIT_SHA', '.', '-f', './restaurant_service/Dockerfile']
   - id: 'Push Restaurant Service Image'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA']
+    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/restaurant-service:$COMMIT_SHA']
   - id: 'Deploy Restaurant Service'
     name: 'gcr.io/cloud-builders/gcloud'
     args:
@@ -79,7 +79,7 @@ steps:
       - 'deploy'
       - 'restaurant-service'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/restaurant-service:$COMMIT_SHA'
       - '--platform'
       - 'managed'
       - '--region'
@@ -98,7 +98,7 @@ steps:
       - |
         SERVICE_URL=$$(gcloud run services describe restaurant-service --platform managed --region ${_REGION} --format 'value(status.url)')
         gcloud pubsub subscriptions create restaurant-service-sub 
-          --topic orders.created 
+          --topic projects/$PROJECT_ID/topics/orders.created 
           --push-endpoint "$$SERVICE_URL" 
           --enable-wrapper-headers 
           --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
