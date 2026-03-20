@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Configuration variables - REPLACE WITH YOUR VALUES
-PROJECT_ID="[YOUR_PROJECT_ID]"
-REGION="[YOUR_REGION]" # e.g., us-central1
+PROJECT_ID="trainocat-1773726908289"
+REGION="us-central1" # e.g., us-central1
 SERVICE_ACCOUNT_NAME="figgy-service-account"
 SA_EMAIL="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -153,5 +153,5 @@ gcloud artifacts repositories create figgy-repo \
 
 
 echo "GCP Setup Complete."
-echo "Remember to update [YOUR_PROJECT_ID] and [YOUR_REGION] in this script before running."
+echo "Remember to update trainocat-1773726908289 and us-central1 in this script before running."
 echo "Also, ensure the 'Cloud Functions Developer' role is granted to the Google-managed service account for Cloud Build (service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com) for deploying Cloud Functions via Cloud Build."
