@@ -75,26 +75,18 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role="roles/serviceusage.serviceUsageAdmin" --quiet
 
 
-
-
-
 # --- Cloud Build Service Account Setup for Cloud Functions Deployment ---
 
 echo "Retrieving project number for Cloud Build service account..."
 
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
-
 CLOUD_BUILD_SA_EMAIL="service-${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
-
-
 
 echo "Assigning Cloud Functions Developer and Service Account User roles to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
   --role="roles/cloudfunctions.developer" --quiet
-
-
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
@@ -108,49 +100,21 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 
     echo "Assigning Artefact Registry Writer role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
 
-  
-
     gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-
-  
-
       --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
-
-  
-
       --role="roles/artifactregistry.writer" --quiet
-
-  
-
-  
-
-  
 
     echo "Assigning Artefact Registry Repository Creator role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
 
-  
-
     gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-
-  
-
       --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
-
-  
-
       --role="roles/artifactregistry.repoCreator" --quiet
-
-  
 
   echo "Assigning Storage Admin role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
 
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
     --role="roles/storage.admin" --quiet
-
-
-
-
 
 # --- GCP Resource Creation ---
 
