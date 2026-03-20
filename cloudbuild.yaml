@@ -106,7 +106,7 @@ steps:
       - '--source'
       - './delivery_completion_service'
       - '--entry-point'
-      - 'complete_delivery'
+      - 'app'
       - '--region'
       - '${_REGION}'
       - '--service-account'
