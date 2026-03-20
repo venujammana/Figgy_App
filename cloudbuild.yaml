@@ -124,6 +124,14 @@ steps:
       - 'GCP_PROJECT=$PROJECT_ID'
 
   # Deploy Delivery Orchestrator (Cloud Function)
+  - id: 'Prepare Delivery Orchestrator CF Source'
+    name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cp -R common ./delivery_orchestrator/common
+
   - id: 'Deploy Delivery Orchestrator CF'
     name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
