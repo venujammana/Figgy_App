@@ -57,7 +57,7 @@ steps:
       - '-c'
       - |
         SERVICE_URL=$$(gcloud run services describe order-processor --platform managed --region ${_REGION} --format 'value(status.url)')
-        gcloud pubsub subscriptions create order-processor-sub --topic orders.place --topic-project $PROJECT_ID --push-endpoint "$$SERVICE_URL" --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" --ack-deadline=300 --message-retention-duration=7d || true # Create or update
+        gcloud pubsub subscriptions create order-processor-sub --topic orders.place --topic-project $PROJECT_ID --push-endpoint "$$SERVICE_URL" --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" --ack-deadline=300 --message-retention-duration=7d 2>&1 | grep -q "Resource already exists" && exit 0 || exit $? # Create or update, ignore if exists
 
   # Build and Deploy Restaurant Service (Cloud Run)
   - id: 'Build Restaurant Service'
@@ -91,7 +91,7 @@ steps:
       - '-c'
       - |
         SERVICE_URL=$$(gcloud run services describe restaurant-service --platform managed --region ${_REGION} --format 'value(status.url)')
-        gcloud pubsub subscriptions create restaurant-service-sub --topic-project $PROJECT_ID --topic orders.created --push-endpoint "$$SERVICE_URL" --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" --ack-deadline=300 --message-retention-duration=7d || true
+        gcloud pubsub subscriptions create restaurant-service-sub --topic-project $PROJECT_ID --topic orders.created --push-endpoint "$$SERVICE_URL" --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" --ack-deadline=300 --message-retention-duration=7d 2>&1 | grep -q "Resource already exists" && exit 0 || exit $?
 
   # Deploy Delivery Completion Service (Cloud Function) - needs to be deployed first to get URL
   - id: 'Deploy Delivery Completion CF'

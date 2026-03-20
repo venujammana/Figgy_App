@@ -4,7 +4,8 @@ from common.firestore_client import get_firestore_client
 from google.cloud import firestore
 
 app = Flask(__name__)
-db = get_firestore_client()
+# Initialize db as None globally, it will be lazily initialized
+db = None
 
 @app.route("/", methods=["POST"])
 def complete_delivery_endpoint():
@@ -12,6 +13,10 @@ def complete_delivery_endpoint():
     HTTP-triggered function invoked by a Cloud Task.
     Updates the order status to 'delivered'.
     """
+    global db
+    if db is None:
+        db = get_firestore_client()
+
     data = request.get_json(silent=True)
     if not data or not data.get("order_id"):
         print("No order_id in request payload.")
