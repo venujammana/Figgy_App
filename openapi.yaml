@@ -13,9 +13,9 @@ paths:
       summary: Place a new order
       operationId: placeOrder
       x-google-backend:
-        address: "[PASTE_YOUR_USER_SERVICE_URL_HERE]/orders"
+        address: "https://user-service-629228625672.us-central1.run.app/orders"
         # For authenticated calls from API Gateway to Cloud Run
-        # audience: [PASTE_YOUR_USER_SERVICE_URL_HERE]
+        # audience: https://user-service-629228625672.us-central1.run.app
       responses:
         '202': # Accepted, as Order Processor handles creation asynchronously
           description: Order initiated
@@ -36,8 +36,8 @@ paths:
           type: string
           required: true
       x-google-backend:
-        address: "[PASTE_YOUR_USER_SERVICE_URL_HERE]/orders/{order_id}"
-        # audience: [PASTE_YOUR_USER_SERVICE_URL_HERE]
+        address: "https://user-service-629228625672.us-central1.run.app/orders/{order_id}"
+        # audience: https://user-service-629228625672.us-central1.run.app
       responses:
         '200':
           description: Order details
@@ -53,3 +53,28 @@ paths:
               updated_at: {type: string, format: date-time}
         '404':
           description: Order not found
+  /restaurants:
+    get:
+      summary: List all restaurants
+      operationId: listRestaurants
+      x-google-backend:
+        address: "https://user-service-629228625672.us-central1.run.app/restaurants"
+        # audience: https://user-service-629228625672.us-central1.run.app
+      responses:
+        '200':
+          description: A list of restaurants
+  /restaurants/{restaurant_id}:
+    get:
+      summary: Get restaurant details
+      operationId: getRestaurant
+      parameters:
+        - in: path
+          name: restaurant_id
+          type: string
+          required: true
+      x-google-backend:
+        address: "https://user-service-629228625672.us-central1.run.app/restaurants/{restaurant_id}"
+        # audience: https://user-service-629228625672.us-central1.run.app
+      responses:
+        '200':
+          description: Restaurant details

@@ -1,12 +1,14 @@
-FROM python:3.9-slim
+FROM python:3.9
 WORKDIR /app
 
 # Copy common utilities to /app/common
 COPY common /app/common
 
+
+
 # Copy service-specific requirements
 COPY user_service/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN set -ex && pip --verbose install --no-cache-dir -r requirements.txt
 
 # Copy service-specific code
 COPY user_service/main.py ./main.py
