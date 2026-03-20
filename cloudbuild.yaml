@@ -94,6 +94,14 @@ steps:
         gcloud pubsub subscriptions create restaurant-service-sub --topic-project $PROJECT_ID --topic orders.created --push-endpoint "$$SERVICE_URL" --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" --ack-deadline=300 --message-retention-duration=7d 2>&1 | grep -q "Resource already exists" && exit 0 || exit $?
 
   # Deploy Delivery Completion Service (Cloud Function) - needs to be deployed first to get URL
+  - id: 'Prepare Delivery Completion CF Source'
+    name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cp -R common ./delivery_completion_service/common
+
   - id: 'Deploy Delivery Completion CF'
     name: 'gcr.io/cloud-builders/gcloud'
     args:
