@@ -58,9 +58,9 @@ steps:
       - |
         SERVICE_URL=$$(gcloud run services describe order-processor --platform managed --region ${_REGION} --format 'value(status.url)')
         gcloud pubsub subscriptions create order-processor-sub 
-          --topic projects/$PROJECT_ID/topics/orders.place 
+          --topic orders.place
+          --topic-project $PROJECT_ID
           --push-endpoint "$$SERVICE_URL" 
-          --enable-wrapper-headers 
           --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
           --ack-deadline=300 
           --message-retention-duration=7d || true # Create or update
@@ -98,9 +98,9 @@ steps:
       - |
         SERVICE_URL=$$(gcloud run services describe restaurant-service --platform managed --region ${_REGION} --format 'value(status.url)')
         gcloud pubsub subscriptions create restaurant-service-sub 
-          --topic projects/$PROJECT_ID/topics/orders.created 
+          --topic-project $PROJECT_ID
+          --topic orders.created 
           --push-endpoint "$$SERVICE_URL" 
-          --enable-wrapper-headers 
           --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
           --ack-deadline=300 
           --message-retention-duration=7d || true
@@ -126,7 +126,6 @@ steps:
       - '--allow-unauthenticated' # Cloud Tasks will handle auth via OIDC token
       - '--set-env-vars' # Pass PROJECT_ID for common client to initialize
       - 'GCP_PROJECT=$PROJECT_ID'
-    waitFor: ['Deploy Restaurant Service'] # Ensure other services are up
 
   # Deploy Delivery Orchestrator (Cloud Function)
   - id: 'Deploy Delivery Orchestrator CF'
@@ -145,7 +144,7 @@ steps:
           --service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
           --no-allow-unauthenticated 
           --set-env-vars="DELIVERY_COMPLETION_URL=$$DELIVERY_COMPLETION_URL,GCP_PROJECT=$PROJECT_ID,FUNCTION_REGION=${_REGION},SERVICE_ACCOUNT_EMAIL=figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com"
-    waitFor: ['Deploy Delivery Completion CF']
+    waitFor: ['Deploy Delivery Completion CF', 'Deploy Restaurant Service', 'Deploy Order Processor', 'Deploy User Service']
 
 # Set global environment variables
 options:
