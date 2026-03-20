@@ -26,6 +26,7 @@ deploy:
     # This section focuses on Cloud Run services.
     defaultProjectID: "[YOUR_PROJECT_ID]"
     region: "[YOUR_REGION]"
+    serviceAccount: "figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com"
     projects:
       - "[YOUR_PROJECT_ID]"
     configs:
