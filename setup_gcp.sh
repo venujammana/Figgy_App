@@ -33,32 +33,32 @@ gcloud services enable \
 
 # --- Service Account Setup ---
 echo "Creating service account: ${SERVICE_ACCOUNT_NAME}..."
-gcloud iam service-accounts create "$SERVICE_ACCOUNT_NAME" 
+gcloud iam service-accounts create "$SERVICE_ACCOUNT_NAME" \
   --display-name="Figgy Food Delivery Service Account" || true # '|| true' to ignore if already exists
 
 echo "Assigning IAM roles to service account: ${SA_EMAIL}..."
 # Common roles for all services
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
   --role="roles/datastore.user" --quiet
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
   --role="roles/pubsub.publisher" --quiet
 
 # Roles specific to Pub/Sub Push subscribers (Cloud Run services)
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
   --role="roles/pubsub.subscriber" --quiet
 
 # Role for Cloud Tasks to enqueue
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
   --role="roles/cloudtasks.enqueuer" --quiet
 
 # Role for Cloud Tasks to invoke HTTP Cloud Function (OIDC token generation)
-gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" 
-    --member="serviceAccount:$SA_EMAIL" 
+gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+    --member="serviceAccount:$SA_EMAIL" \
     --role="roles/iam.serviceAccountUser" --quiet
 
 # Role for Cloud Run services to invoke other services (e.g. Delivery Orchestrator) if using authenticated calls
@@ -70,8 +70,8 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$SA_EMAIL" \
   --role="roles/cloudtasks.admin" --quiet
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
   --role="roles/serviceusage.serviceUsageAdmin" --quiet
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
