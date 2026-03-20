@@ -109,7 +109,7 @@ steps:
       - 'app'
       - '--region'
       - '${_REGION}'
-      - '--service-account'
+      - '--run-service-account'
       - 'figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com'
       - '--allow-unauthenticated' # Cloud Tasks will handle auth via OIDC token
       - '--set-env-vars' # Pass PROJECT_ID for common client to initialize
