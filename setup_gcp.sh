@@ -102,11 +102,39 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 
   
 
-  echo "Assigning Artefact Registry Writer role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
+    echo "Assigning Artefact Registry Writer role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
 
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
-    --role="roles/artifactregistry.writer" --quiet
+  
+
+    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+
+  
+
+      --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
+
+  
+
+      --role="roles/artifactregistry.writer" --quiet
+
+  
+
+  
+
+  
+
+    echo "Assigning Artefact Registry Repository Creator role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
+
+  
+
+    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+
+  
+
+      --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
+
+  
+
+      --role="roles/artifactregistry.repoCreator" --quiet
 
   
 
