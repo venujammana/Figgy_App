@@ -131,15 +131,7 @@ steps:
       - '-c'
       - |
         DELIVERY_COMPLETION_URL=$$(gcloud functions describe delivery-completion-service --region ${_REGION} --format 'value(httpsTrigger.url)')
-        gcloud functions deploy delivery-orchestrator 
-          --runtime python39 
-          --trigger-http 
-          --source ./delivery_orchestrator 
-          --entry-point orchestrate_delivery 
-          --region "${_REGION}" 
-          --service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
-          --no-allow-unauthenticated 
-          --set-env-vars="DELIVERY_COMPLETION_URL=$$DELIVERY_COMPLETION_URL,GCP_PROJECT=$PROJECT_ID,FUNCTION_REGION=${_REGION},SERVICE_ACCOUNT_EMAIL=figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com"
+        gcloud functions deploy delivery-orchestrator --runtime python39 --trigger-http --source ./delivery_orchestrator --entry-point orchestrate_delivery --region "${_REGION}" --service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" --no-allow-unauthenticated --set-env-vars="DELIVERY_COMPLETION_URL=$$DELIVERY_COMPLETION_URL,GCP_PROJECT=$PROJECT_ID,FUNCTION_REGION=${_REGION},SERVICE_ACCOUNT_EMAIL=figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com"
     waitFor: ['Deploy Delivery Completion CF', 'Deploy Restaurant Service', 'Deploy Order Processor', 'Deploy User Service']
 
 # Set global environment variables
