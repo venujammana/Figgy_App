@@ -13,9 +13,9 @@ paths:
       summary: Place a new order
       operationId: placeOrder
       x-google-backend:
-        address: "https://user-service-629228625672.us-central1.run.app/orders"
+        address: "[PASTE_YOUR_USER_SERVICE_URL_HERE]/orders"
         # For authenticated calls from API Gateway to Cloud Run
-        # audience: https://user-service-629228625672.us-central1.run.app
+        # audience: [PASTE_YOUR_USER_SERVICE_URL_HERE]
       responses:
         '202': # Accepted, as Order Processor handles creation asynchronously
           description: Order initiated
@@ -36,8 +36,8 @@ paths:
           type: string
           required: true
       x-google-backend:
-        address: "https://user-service-629228625672.us-central1.run.app/orders/{order_id}"
-        # audience: https://user-service-629228625672.us-central1.run.app
+        address: "[PASTE_YOUR_USER_SERVICE_URL_HERE]/orders/{order_id}"
+        # audience: [PASTE_YOUR_USER_SERVICE_URL_HERE]
       responses:
         '200':
           description: Order details
@@ -58,8 +58,8 @@ paths:
       summary: List all restaurants
       operationId: listRestaurants
       x-google-backend:
-        address: "https://user-service-629228625672.us-central1.run.app/restaurants"
-        # audience: https://user-service-629228625672.us-central1.run.app
+        address: "[PASTE_YOUR_USER_SERVICE_URL_HERE]/restaurants"
+        # audience: [PASTE_YOUR_USER_SERVICE_URL_HERE]
       responses:
         '200':
           description: A list of restaurants
@@ -73,8 +73,8 @@ paths:
           type: string
           required: true
       x-google-backend:
-        address: "https://user-service-629228625672.us-central1.run.app/restaurants/{restaurant_id}"
-        # audience: https://user-service-629228625672.us-central1.run.app
+        address: "[PASTE_YOUR_USER_SERVICE_URL_HERE]/restaurants/{restaurant_id}"
+        # audience: [PASTE_YOUR_USER_SERVICE_URL_HERE]
       responses:
         '200':
           description: Restaurant details
