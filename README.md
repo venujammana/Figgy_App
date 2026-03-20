@@ -139,91 +139,12 @@ A dedicated service account with the principle of least privilege will be create
 Firestore, Pub/Sub topics, and Cloud Tasks Queue will be created by the setup script.
 
 ### GCP Setup Script (`setup_gcp.sh`)
-This script automates the initial setup of your GCP project, including API enablement, service account creation, IAM role assignments, Firestore database creation, Pub/Sub topic setup, and Cloud Tasks queue creation.
-
-```bash
-#!/bin/bash
-
-# Configuration variables - REPLACE WITH YOUR VALUES
-PROJECT_ID="[YOUR_PROJECT_ID]"
-REGION="[YOUR_REGION]" # e.g., us-central1
-SERVICE_ACCOUNT_NAME="figgy-service-account"
-SA_EMAIL="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-
-# --- Project Setup ---
-echo "Configuring gcloud project and region..."
-gcloud config set project "$PROJECT_ID"
-gcloud config set run/region "$REGION"
-gcloud config set functions/region "$REGION"
-
-# --- Enable necessary APIs ---
-echo "Enabling required GCP APIs..."
-gcloud services enable 
-  run.googleapis.com 
-  cloudfunctions.googleapis.com 
-  cloudbuild.googleapis.com 
-  pubsub.googleapis.com 
-  firestore.googleapis.com 
-  cloudtasks.googleapis.com 
-  apigateway.googleapis.com 
-  iam.googleapis.com 
-  servicecontrol.googleapis.com 
-  servicemanagement.googleapis.com 
-  cloudresourcemanager.googleapis.com # Needed for policy bindings
-
-# --- Service Account Setup ---
-echo "Creating service account: ${SERVICE_ACCOUNT_NAME}..."
-gcloud iam service-accounts create "$SERVICE_ACCOUNT_NAME" 
-  --display-name="Figgy Food Delivery Service Account" || true # '|| true' to ignore if already exists
-
-echo "Assigning IAM roles to service account: ${SA_EMAIL}..."
-# Common roles for all services
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
-  --role="roles/datastore.user" --quiet
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
-  --role="roles/pubsub.publisher" --quiet
-
-# Roles specific to Pub/Sub Push subscribers (Cloud Run services)
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
-  --role="roles/pubsub.subscriber" --quiet
-
-# Role for Cloud Tasks to enqueue
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
-  --role="roles/cloudtasks.enqueuer" --quiet
-
-# Role for Cloud Tasks to invoke HTTP Cloud Function (OIDC token generation)
-gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" 
-    --member="serviceAccount:$SA_EMAIL" 
-    --role="roles/iam.serviceAccountUser" --quiet
-
-# Role for Cloud Run services to invoke other services (e.g. Delivery Orchestrator) if using authenticated calls
-gcloud projects add-iam-policy-binding "$PROJECT_ID" 
-  --member="serviceAccount:$SA_EMAIL" 
-  --role="roles/run.invoker" --quiet
-
-
-# --- GCP Resource Creation ---
-echo "Creating Firestore database..."
-gcloud firestore databases create --location="$REGION" || true # '|| true' to ignore if already exists
-
-echo "Creating Pub/Sub topics..."
-gcloud pubsub topics create orders.place || true
-gcloud pubsub topics create orders.created || true
-gcloud pubsub topics create orders.accepted || true
-gcloud pubsub topics create orders.rejected || true
-
-echo "Creating Cloud Tasks queue: delivery-simulation-queue..."
-gcloud tasks queues create delivery-simulation-queue --location="$REGION" || true
-
-echo "GCP Setup Complete."
-echo "Remember to update [YOUR_PROJECT_ID] and [YOUR_REGION] in this script before running."
-echo "Also, ensure the 'Cloud Functions Developer', 'Cloud Functions Viewer', 'Artefact Registry Writer', 'Artefact Registry Repository Creator', and 'Storage Admin' roles are granted to the Google-managed service account for Cloud Build (service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com) for deploying Cloud Functions, pushing images to Artefact Registry (including creating repositories on push), and deploying to Cloud Storage via Cloud Build."
-```
+This script automates the initial setup of your GCP project, including:
+*   Enabling necessary GCP APIs (Run, Cloud Functions, Cloud Build, Pub/Sub, Firestore, Cloud Tasks, API Gateway, IAM, Service Control, Service Management, Cloud Resource Manager, Eventarc, Compute, Artifact Registry, Secret Manager).
+*   Creating a dedicated service account (`figgy-service-account`) and assigning it essential roles such as `roles/datastore.user`, `roles/pubsub.publisher`, `roles/pubsub.subscriber`, `roles/cloudtasks.enqueuer`, `roles/iam.serviceAccountUser`, `roles/run.invoker`, `roles/cloudtasks.admin`, `roles/serviceusage.serviceUsageAdmin`, `roles/logging.logWriter`, `roles/monitoring.metricWriter`, and `roles/secretmanager.secretAccessor`.
+*   Assigning additional roles to the **Cloud Build service account** (`service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`) for deploying Cloud Functions, pushing images to Artifact Registry, and managing Pub/Sub resources, specifically adding `roles/pubsub.editor`.
+*   Creating a Firestore database, Pub/Sub topics (`orders.place`, `orders.created`, `orders.accepted`, `orders.rejected`), and a Cloud Tasks queue (`delivery-simulation-queue`).
+*   Creating an Artifact Registry Docker repository (`figgy-repo`).
 
 ---
 
@@ -296,12 +217,12 @@ To run the frontend application locally:
     ```
     **Important:** Ensure the `REACT_APP_API_GATEWAY_URL` in `frontend/.env` points to your *deployed* API Gateway (or a proxy to it) if you want to interact with the deployed backend. For initial local testing with the backend also running locally, you might point it to `http://localhost:8080` (or wherever your backend serves).
 
-#### Deployment to Google Cloud Storage
+### 6.2 Frontend Deployment
 
-The frontend can be deployed as a static website to Google Cloud Storage and optionally served via Google Cloud CDN for optimal performance. A dedicated `cloudbuild.yaml` is provided within the `frontend/` directory for this purpose.
+The frontend application can be deployed as a static website to Google Cloud Storage and optionally served via Google Cloud CDN for optimal performance. A dedicated `cloudbuild.yaml` is provided within the `frontend/` directory for this purpose.
 
 1.  **Ensure Cloud Storage API is enabled:** This is handled by the `setup_gcp.sh` script.
-2.  **Ensure necessary IAM roles are granted:** The Cloud Build service account needs write permissions to the GCS bucket (`roles/storage.admin` or `roles/storage.objectAdmin`).
+2.  **Ensure necessary IAM roles are granted:** The Cloud Build service account needs write permissions to the GCS bucket (`roles/storage.admin` or `roles/storage.objectAdmin`), which is handled by the `setup_gcp.sh` script.
 3.  **Deploy using Cloud Build:**
     Navigate to the root of the `Figgy_App` directory and submit the `frontend/cloudbuild.yaml`. You *must* provide the `_API_GATEWAY_URL` substitution with the URL of your deployed API Gateway.
 
@@ -313,8 +234,9 @@ The frontend can be deployed as a static website to Google Cloud Storage and opt
 
     After successful deployment, your frontend application will be available at `https://storage.googleapis.com/[YOUR_FRONTEND_BUCKET_NAME]/index.html` (where `[YOUR_FRONTEND_BUCKET_NAME]` defaults to `figgy-frontend-[YOUR_PROJECT_ID]`). For a custom domain or CDN setup, further GCP configuration is required.
 
-
 ### Common Utilities (`Figgy/common/`)
+
+### 6.3 Backend Service Deployment (Manual)
 
 **`Figgy/common/firestore_client.py`**
 ```python
@@ -807,18 +729,19 @@ This section details how to automate the build and deployment process using Goog
 
 ### 5.1 Cloud Build for CI/CD
 
-The `cloudbuild.yaml` file defines a comprehensive CI/CD pipeline. It automates the following for your microservices:
+The `cloudbuild.yaml` file defines a comprehensive CI/CD pipeline. It automates the following for your microservices and frontend:
 *   Building Docker images for Cloud Run services.
 *   Pushing Docker images to Google Container Registry (GCR) or Artifact Registry.
 *   Deploying Cloud Run services to the specified region.
 *   Creating Pub/Sub push subscriptions for Cloud Run services.
 *   Deploying Cloud Functions (Delivery Orchestrator and Delivery Completion Service).
 *   Setting up environment variables for Cloud Functions, including the URL of the Delivery Completion Service.
+*   Deploying the React frontend to Google Cloud Storage.
 
 To trigger an automated deployment using Cloud Build:
 
 1.  **Ensure Cloud Build API is enabled:** This is handled by the `setup_gcp.sh` script.
-2.  **Ensure necessary IAM roles are granted:** The Cloud Build service account (`service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`) needs appropriate permissions, including `Cloud Functions Developer` and `Service Account User` roles for deploying Cloud Functions. This is handled by the updated `setup_gcp.sh` script.
+2.  **Ensure necessary IAM roles are granted:** The Cloud Build service account (`service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`) needs appropriate permissions, including `Cloud Functions Developer`, `Service Account User`, `Artifact Registry Writer`, `Artifact Registry Repository Creator`, `Storage Admin`, and `Pub/Sub Editor` roles for deploying Cloud Functions, pushing images, managing Pub/Sub, and deploying the frontend. This is handled by the updated `setup_gcp.sh` script.
 3.  **Submit the `cloudbuild.yaml`:**
     Navigate to the root of the `Figgy_App` directory and run the following command. Replace `[YOUR_REGION]` with your desired GCP region.
 
@@ -854,11 +777,11 @@ To use Skaffold:
 
 ## 6. Deployment Steps
 
-This section outlines how to manually set up your GCP project and deploy the Figgy Food Delivery microservices.
+This section outlines how to set up your GCP project and deploy the Figgy Food Delivery microservices.
 
-### 6.1 Initial GCP Project Setup
+### 6.1 Initial GCP Resources and IAM Setup
 
-Before deploying the application, you need to set up your Google Cloud Project.
+Before deploying the application, you need to set up your Google Cloud Project resources and IAM permissions.
 
 1.  **Configure gcloud CLI:**
     Ensure your `gcloud` CLI is configured to the correct project and region. Replace `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` with your actual project ID and desired GCP region (e.g., `us-central1`).
@@ -870,13 +793,19 @@ Before deploying the application, you need to set up your Google Cloud Project.
     ```
 
 2.  **Run the GCP Setup Script:**
-    Navigate to the root of the `Figgy_App` directory and execute the `setup_gcp.sh` script. This script automates API enablement, service account creation, IAM role assignments, Firestore database creation, Pub/Sub topic setup, and Cloud Tasks queue creation.
+    Navigate to the root of the `Figgy_App` directory and execute the `setup_gcp.sh` script.
+
+    **Important:** First, open `setup_gcp.sh` and replace `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` with your actual project ID and desired GCP region.
+    This script automates:
+    *   Enabling all necessary GCP APIs.
+    *   Creating the `figgy-service-account` and assigning it the required roles (`datastore.user`, `pubsub.publisher`, `pubsub.subscriber`, `cloudtasks.enqueuer`, `iam.serviceAccountUser`, `run.invoker`, `cloudtasks.admin`, `serviceusage.serviceUsageAdmin`, `logging.logWriter`, `monitoring.metricWriter`, `secretmanager.secretAccessor`).
+    *   Assigning `roles/cloudfunctions.developer`, `roles/iam.serviceAccountUser`, `roles/cloudfunctions.viewer`, `roles/artifactregistry.writer`, `roles/artifactregistry.repoCreator`, `roles/storage.admin`, and crucially, `roles/pubsub.editor` to the **Cloud Build service account** (`service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`).
+    *   Creating a Firestore database, Pub/Sub topics, a Cloud Tasks queue, and an Artifact Registry Docker repository.
 
     ```bash
     chmod +x setup_gcp.sh
     ./setup_gcp.sh
     ```
-    **Important:** Before running, ensure you have reviewed and replaced `[YOUR_PROJECT_ID]` and `[YOUR_REGION]` within the `setup_gcp.sh` script itself, if you prefer to hardcode them. The script relies on these variables. Also, ensure the Cloud Build Service Account (`service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`) has the `Cloud Functions Developer` role for Cloud Build to deploy Cloud Functions (this is handled by the updated `setup_gcp.sh`).
 
 ### 6.2 Manual Service Deployment
 
@@ -1005,7 +934,7 @@ Deploy the two Cloud Functions: `delivery-completion-service` and `delivery-orch
     ```
 
 
-### API Gateway Setup
+### 6.4 API Gateway Setup
 
 **1. Create `Figgy/openapi.yaml`**
 ```yaml

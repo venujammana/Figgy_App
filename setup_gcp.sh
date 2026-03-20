@@ -70,9 +70,21 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$SA_EMAIL" \
   --role="roles/cloudtasks.admin" --quiet
 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" 
+  --member="serviceAccount:$SA_EMAIL" 
+  --role="roles/serviceusage.serviceUsageAdmin" --quiet
+
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$SA_EMAIL" \
-  --role="roles/serviceusage.serviceUsageAdmin" --quiet
+  --role="roles/logging.logWriter" --quiet
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="roles/monitoring.metricWriter" --quiet
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="roles/secretmanager.secretAccessor" --quiet
 
 
 # --- Cloud Build Service Account Setup for Cloud Functions Deployment ---
@@ -112,10 +124,13 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 
   echo "Assigning Storage Admin role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
 
+      gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+        --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
+        --role="roles/storage.admin" --quiet
+  
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
-    --role="roles/storage.admin" --quiet
-
+    --role="roles/pubsub.editor" --quiet
 # --- GCP Resource Creation ---
 
 echo "Creating Firestore database..."
