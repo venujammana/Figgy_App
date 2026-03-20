@@ -3,7 +3,7 @@ steps:
   # Build and Deploy User Service (Cloud Run)
   - id: 'Build User Service'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA', './user_service']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA', '.', '-f', './user_service/Dockerfile']
   - id: 'Push User Service Image'
     name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA']
@@ -28,7 +28,7 @@ steps:
   # Build and Deploy Order Processor (Cloud Run)
   - id: 'Build Order Processor'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA', './order_processor']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA', '.', '-f', './order_processor/Dockerfile']
   - id: 'Push Order Processor Image'
     name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA']
@@ -56,10 +56,10 @@ steps:
     args:
       - '-c'
       - |
-        SERVICE_URL=$(gcloud run services describe order-processor --platform managed --region ${_REGION} --format 'value(status.url)')
+        SERVICE_URL=$$(gcloud run services describe order-processor --platform managed --region ${_REGION} --format 'value(status.url)')
         gcloud pubsub subscriptions create order-processor-sub 
           --topic orders.place 
-          --push-endpoint "$SERVICE_URL" 
+          --push-endpoint "$$SERVICE_URL" 
           --enable-wrapper-headers 
           --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
           --ack-deadline=300 
@@ -68,7 +68,7 @@ steps:
   # Build and Deploy Restaurant Service (Cloud Run)
   - id: 'Build Restaurant Service'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA', './restaurant_service']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA', '.', '-f', './restaurant_service/Dockerfile']
   - id: 'Push Restaurant Service Image'
     name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA']
@@ -96,10 +96,10 @@ steps:
     args:
       - '-c'
       - |
-        SERVICE_URL=$(gcloud run services describe restaurant-service --platform managed --region ${_REGION} --format 'value(status.url)')
+        SERVICE_URL=$$(gcloud run services describe restaurant-service --platform managed --region ${_REGION} --format 'value(status.url)')
         gcloud pubsub subscriptions create restaurant-service-sub 
           --topic orders.created 
-          --push-endpoint "$SERVICE_URL" 
+          --push-endpoint "$$SERVICE_URL" 
           --enable-wrapper-headers 
           --push-auth-service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
           --ack-deadline=300 
@@ -135,7 +135,7 @@ steps:
     args:
       - '-c'
       - |
-        DELIVERY_COMPLETION_URL=$(gcloud functions describe delivery-completion-service --region ${_REGION} --format 'value(httpsTrigger.url)')
+        DELIVERY_COMPLETION_URL=$$(gcloud functions describe delivery-completion-service --region ${_REGION} --format 'value(httpsTrigger.url)')
         gcloud functions deploy delivery-orchestrator 
           --runtime python39 
           --trigger-http 
@@ -144,7 +144,7 @@ steps:
           --region "${_REGION}" 
           --service-account="figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com" 
           --no-allow-unauthenticated 
-          --set-env-vars="DELIVERY_COMPLETION_URL=$DELIVERY_COMPLETION_URL,GCP_PROJECT=$PROJECT_ID,FUNCTION_REGION=${_REGION},SERVICE_ACCOUNT_EMAIL=figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com"
+          --set-env-vars="DELIVERY_COMPLETION_URL=$$DELIVERY_COMPLETION_URL,GCP_PROJECT=$PROJECT_ID,FUNCTION_REGION=${_REGION},SERVICE_ACCOUNT_EMAIL=figgy-service-account@$PROJECT_ID.iam.gserviceaccount.com"
     waitFor: ['Deploy Delivery Completion CF']
 
 # Set global environment variables
