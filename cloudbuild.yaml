@@ -3,10 +3,10 @@ steps:
   # Build and Deploy User Service (Cloud Run)
   - id: 'Build User Service'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA', '.', '-f', './user_service/Dockerfile']
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/user-service:$COMMIT_SHA', '.', '-f', './user_service/Dockerfile']
   - id: 'Push User Service Image'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA']
+    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/user-service:$COMMIT_SHA']
   - id: 'Deploy User Service'
     name: 'gcr.io/cloud-builders/gcloud'
     args:
@@ -14,7 +14,7 @@ steps:
       - 'deploy'
       - 'user-service'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/user-service:$COMMIT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/user-service:$COMMIT_SHA'
       - '--platform'
       - 'managed'
       - '--region'
@@ -28,10 +28,10 @@ steps:
   # Build and Deploy Order Processor (Cloud Run)
   - id: 'Build Order Processor'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA', '.', '-f', './order_processor/Dockerfile']
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/order-processor:$COMMIT_SHA', '.', '-f', './order_processor/Dockerfile']
   - id: 'Push Order Processor Image'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA']
+    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/order-processor:$COMMIT_SHA']
   - id: 'Deploy Order Processor'
     name: 'gcr.io/cloud-builders/gcloud'
     args:
@@ -39,7 +39,7 @@ steps:
       - 'deploy'
       - 'order-processor'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/order-processor:$COMMIT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/order-processor:$COMMIT_SHA'
       - '--platform'
       - 'managed'
       - '--region'
@@ -68,7 +68,7 @@ steps:
   # Build and Deploy Restaurant Service (Cloud Run)
   - id: 'Build Restaurant Service'
     name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA', '.', '-f', './restaurant_service/Dockerfile']
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/figgy-repo/restaurant-service:$COMMIT_SHA', '.', '-f', './restaurant_service/Dockerfile']
   - id: 'Push Restaurant Service Image'
     name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/restaurant-service:$COMMIT_SHA']

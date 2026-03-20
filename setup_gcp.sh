@@ -97,9 +97,13 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
-    --role="roles/iam.serviceAccountUser" --quiet
+  --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
+  --role="roles/iam.serviceAccountUser" --quiet
 
+echo "Assigning Cloud Functions Viewer role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
+  --role="roles/cloudfunctions.viewer" --quiet
   
 
     echo "Assigning Artefact Registry Writer role to Cloud Build service account: ${CLOUD_BUILD_SA_EMAIL}..."
@@ -161,6 +165,13 @@ gcloud pubsub topics create orders.rejected || true
 
 echo "Creating Cloud Tasks queue: delivery-simulation-queue..."
 gcloud tasks queues create delivery-simulation-queue --location="$REGION" || true
+
+echo "Creating Artifact Registry Docker repository: figgy-repo..."
+gcloud artifacts repositories create figgy-repo \
+  --repository-format=docker \
+  --location="$REGION" \
+  --description="Docker repository for Figgy Food Delivery microservices" || true # '|| true' to ignore if already exists
+
 
 echo "GCP Setup Complete."
 echo "Remember to update [YOUR_PROJECT_ID] and [YOUR_REGION] in this script before running."

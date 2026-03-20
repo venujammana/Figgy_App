@@ -222,7 +222,7 @@ gcloud tasks queues create delivery-simulation-queue --location="$REGION" || tru
 
 echo "GCP Setup Complete."
 echo "Remember to update [YOUR_PROJECT_ID] and [YOUR_REGION] in this script before running."
-echo "Also, ensure the 'Cloud Functions Developer', 'Artefact Registry Writer', 'Artefact Registry Repository Creator', and 'Storage Admin' roles are granted to the Google-managed service account for Cloud Build (service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com) for deploying Cloud Functions, pushing images to Artefact Registry (including creating repositories on push), and deploying to Cloud Storage via Cloud Build."
+echo "Also, ensure the 'Cloud Functions Developer', 'Cloud Functions Viewer', 'Artefact Registry Writer', 'Artefact Registry Repository Creator', and 'Storage Admin' roles are granted to the Google-managed service account for Cloud Build (service-[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com) for deploying Cloud Functions, pushing images to Artefact Registry (including creating repositories on push), and deploying to Cloud Storage via Cloud Build."
 ```
 
 ---
