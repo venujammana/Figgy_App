@@ -44,3 +44,17 @@ def complete_delivery_endpoint():
     except Exception as e:
         print(f"Error updating order {order_id}: {e}")
         return "Internal Server Error", 500
+
+def cloud_function_entrypoint(request_obj):
+    """
+    Wrapper function to serve the Flask app as a Cloud Function.
+    The functions-framework expects a callable function, not a Flask app object.
+    """
+    with app.test_request_context(
+        path=request_obj.path,
+        method=request_obj.method,
+        headers=request_obj.headers,
+        data=request_obj.data,
+        query_string=request_obj.query_string
+    ):
+        return app.full_dispatch_request()
